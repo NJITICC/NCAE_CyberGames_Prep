@@ -6,8 +6,10 @@ System: Rocky Linux 8.10 (Green Obsidian)
 
 >man page: https://linux.die.net/man/5/vsftpd.conf
 
-## Install vsftpd
-`sudo dnf install -y vsftpd`
+## Install vsftpd 
+```bash
+sudo dnf install -y vsftpd
+```
 ## Enable and Start Service
 ```bash
 sudo systemctl enable --now vsftpd
@@ -57,6 +59,66 @@ table inet filter {
   }
 }
 ```
+Here is a little advanced ruleset that uses sets to easily add and remove allowed ips and limit rates to mitigate DDOS from trusted sources
+```bash
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+    set allowed_ftp_ssh_ips {
+        type ipv4_addr;
+        flags interval;
+        elements = { 173.63.12.60, 172.18.14.0/24, 128.235.123.164 }
+    }
+
+    counter ssh_rate_limit_drops {}
+    counter ftp_rate_limit_drops {}
+
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        # Loopback interface
+        iif "lo" accept
+	
+        # Block and log IPs not in the set
+        ip saddr != @allowed_ftp_ssh_ips tcp dport 22 log prefix "nft-blocked:ssh " flags all drop
+        ip saddr != @allowed_ftp_ssh_ips tcp dport 22 drop
+        
+	      # SSH - Global rate limit
+        ip saddr @allowed_ftp_ssh_ips tcp dport 22 ct state new limit rate 15/minute burst 15 packets
+        accept
+
+        # SSH - Track dropped connection attempts
+        ip saddr @allowed_ftp_ssh_ips tcp dport 22 ct state new counter name ssh_rate_limit_drops
+	
+        # Block and log IPs not in the set
+        ip saddr != @allowed_ftp_ssh_ips tcp dport {21, 40000-50000} log prefix "nft-blocked:ftp " flags all drop
+        ip saddr != @allowed_ftp_ssh_ips tcp dport {21, 40000-50000} drop
+
+        # FTP Passive - Global rate limit
+        ip saddr @allowed_ftp_ssh_ips tcp dport {21, 40000-50000} ct state new limit rate 30/minute burst 15 packets
+        accept
+
+        # FTP - Track dropped connection attempts
+        ip saddr @allowed_ftp_ssh_ips tcp dport {21, 40000-50000} ct state new counter name ftp_rate_limit_drops
+
+        # Allow established and related connections
+        ip saddr @allowed_ftp_ssh_ips ct state established,related accept
+
+        # ICMP Echo (Ping)
+        ip saddr @allowed_ftp_ssh_ips icmp type echo-request accept
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+    }
+
+    chain output {
+        type filter hook output priority filter; policy accept;
+    }
+}
+```
 
 ## Check if SELinux is Enforcing
 ### If SELinux is not Enforcing skip this part
@@ -70,11 +132,17 @@ sudo setsebool -P ftpd_full_access=1
 sudo setsebool -P ftpd_use_passive_mode=1
 ```
 Set context for directory using semanage
+
+First, install `policycoreutils-python-utils`
+```bash
+sudo dnf install policycoreutils-python-utils
+```
+Then, set the context for the directory
 ```bash
 sudo semanage fcontext -a -t public_content_rw_t "/mnt/ftp(/.*)?"
 sudo restorecon -Rv /mnt/ftp
 ```
-## Create or assign shared FTP directory
+## Assign permissions for directory
 >For the regional competition, the scoring users directory was `/mnt/files`
 
 Set root permissions for parent directory
