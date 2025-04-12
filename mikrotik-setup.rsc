@@ -1,14 +1,15 @@
 {
 :local wanInterface ether1
 :local lanInterface ether2
-:local teamNum 4
+:local teamNum 9
 :local wanAddr "172.18.13.$teamNum/16"
 :local lanAddr "192.168.$teamNum.1/24"
 :local compGw 172.18.0.1
 :local compDns 172.18.0.12
 :local teamWeb "192.168.$teamNum.5"
 :local teamDns "192.168.$teamNum.12"
-:local compJumphost 172.18.12.5
+:local teamDb  "192.168.$teamNum.7"
+:local compJumphost 172.18.12.15
 :local compCdn 172.18.13.25
 :local compCa 172.18.0.38
 :local teamFtp "172.18.14.$teamNum"
@@ -52,6 +53,7 @@
   add chain=dstnat action=dst-nat to-address=$teamWeb in-interface=wan dst-port=443 protocol=tcp comment="Web HTTPS"
   add chain=dstnat action=dst-nat to-address=$teamDns in-interface=wan dst-port=53 protocol=tcp comment="DNS TCP"
   add chain=dstnat action=dst-nat to-address=$teamDns in-interface=wan dst-port=53 protocol=udp comment="DNS UDP"
+  add chain=dstnat action=dst-nat to-address=$teamDb in-interface=wan dst-port=5432 protocol=tcp comment="Postgres TCP"
 
 # Firewall
 /ip firewall filter
