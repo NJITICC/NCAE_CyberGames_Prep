@@ -99,13 +99,13 @@ sudo systemctl restart apache2
 
 ## Final Thoughts
 - systemctl cat etechacademy
-- Check if its being run as root USER. If so, swap it
-- systemctl status etechacademy to see its config file
-- Cert script is
+- Make sure to write down where the certificate is coming from
 
 # Cert Script
 certbot --nginx --server https://ca.ncaecybergames.org/acme/acme/directory --no-random-sleep-on-renew
 
 Check if md5sum = 761e8fbafabceac17680a28c82a097d2
+
+/etc/letsencrypt/live/$domain
 
 Link both .pem files to VirtualHost proxy
