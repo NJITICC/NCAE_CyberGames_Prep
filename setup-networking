@@ -4,7 +4,7 @@ IP=192.168.1.2/24
 GATEWAY=192.168.1.1
 DNS=192.168.1.1
 
-nmcli connection edit "$(nmcli -t -f NAME c show)"  << EOF
+nmcli connection edit "$(nmcli -t -f NAME c show | grep -v lo | head -n 1)"  << EOF
 set ipv4.method manual
 set ipv4.address $IP
 set ipv4.gateway $GATEWAY
@@ -15,5 +15,5 @@ EOF
 
 systemctl restart NetworkManager systemd-resolved
 
-nmcli device reapply $(nmcli -g GENERAL.DEVICES con show "$(nmcli -t -f NAME c show)")
+nmcli device reapply $(nmcli -g GENERAL.DEVICES con show "$(nmcli -t -f NAME c show | grep -v lo | head -n 1)")
 netplan generate || true
