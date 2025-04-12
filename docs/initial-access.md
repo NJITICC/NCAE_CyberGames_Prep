@@ -38,7 +38,8 @@ First steps to run once VMs are accessible. **Not for MikroTik router.**
     4. Run the file.
     5. Paste [iptables-restore.service](../firewallSetup/iptables-restore.service) to `/etc/systemd/system/iptables-restore.service`.
     6. Run `systemctl daemon-reload`
-    7. Run `systemctl enable iptables-restore`
+    7. Run `systemctl disable --now firewalld.service` (it's okay if this fails).
+    8. Run `systemctl enable iptables-restore`
     * Future changes to firewall will require running the save commands at the bottom of the firewall scripts.
 
 6. Install command logger.
@@ -61,6 +62,9 @@ First steps to run once VMs are accessible. **Not for MikroTik router.**
 8. Check for bad processes and connections.
     1. `ps aux`
     2. `netstat -tunap`
+    3. `systemctl list-sockets`
+    4. `systemctl list-timers`
+    5. `systemctl list-units`
     * Found something? Quickest method to get rid of is quarantine.
       1. Kill the process.
       2. `mkdir /usr/quarantine`
@@ -73,7 +77,10 @@ First steps to run once VMs are accessible. **Not for MikroTik router.**
     * **If you are on the Shell/FTP machine:** The script will add a group limitation to who can sign in via SSH. This will need to be updated in `/etc/ssh/sshd_config` while setting up shell login.
     * This script will remove the root account credentials.
 10. Notify group that initial access runbook is complete. Proceed with service setup.
-11. Remove cronjobs and acron in "initial setup"
+11. Disable cron/at/anacron.
+    * `systemctl disable --now crond`
     * `systemctl disable --now cron`
-    * `systemctl disable --now at.service`
-    * `systemctl disable --now atd.service`
+    * `systemctl disable --now at`
+    * `systemctl disable --now atd`
+    * `systemctl disable --now anacron`
+    * `systemctl disable --now anacrond`
