@@ -16,6 +16,9 @@ SQL="192.168.9.7"
 CA="172.18.0.38"
 CDN="172.18.13.25"
 
+# Disable firewalld.
+systemctl disable --now firewalld.service 2> /dev/null || true
+
 # Loads conntrack.
 modprobe ip_conntrack
 

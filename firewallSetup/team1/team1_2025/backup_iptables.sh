@@ -16,6 +16,9 @@ DNS="192.168.9.12"
 WEB="192.168.9.5"
 DATABASE="192.168.9.7"
 
+# Disable firewalld.
+systemctl disable --now firewalld.service 2> /dev/null || true
+
 # Loads conntrack.
 modprobe ip_conntrack
 

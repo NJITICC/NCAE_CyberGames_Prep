@@ -11,6 +11,9 @@ fi
 
 COMP_DNS="172.18.0.12"
 
+# Disable firewalld.
+systemctl disable --now firewalld.service 2> /dev/null || true
+
 # Loads conntrack.
 modprobe ip_conntrack
 modprobe ip_conntrack_ftp
