@@ -52,7 +52,7 @@ First steps to run once VMs are accessible. **Not for MikroTik router.**
     * Now, all ran commands will be logged to `/var/log/hellothere.log` (at least with bash).
 
 7. Install Shrek
-    1. Copy contents of [getshrekd.sh](../getshrekd.sh) to `/usr/local/bin/getshrekd.sh`. Edit `GOOD_USERS` to be a list of our first names. This will be sent in Discord.
+    1. Copy contents of [getshrekd.sh](../getshrekd.sh) to `/usr/local/bin/getshrekd.sh`. Edit `GOOD_USERS` to be a list of our first names. This will be sent in Discord. If this is a machine scored with SSH login, a separate script is provided for it.
     2. `chmod +x /usr/local/bin/getshrekd.sh`
     3. Copy contents of [shrek.service](../shrek.service) to `/etc/systemd/system/shrek.service`.
     4. `systemctl daemon-reload`
@@ -76,7 +76,10 @@ First steps to run once VMs are accessible. **Not for MikroTik router.**
     * For the local access user, use the password that is in the team's spreadsheet (there is a passwords tab).
     * **If you are on the Shell/FTP machine:** The script will add a group limitation to who can sign in via SSH. This will need to be updated in `/etc/ssh/sshd_config` while setting up shell login.
     * This script will remove the root account credentials.
-10. Notify group that initial access runbook is complete. Proceed with service setup.
+
+10. ONLY ON MACHINES WITH SSH SCORING: Run [scoring-ssh-setup](../scoring-ssh-setup).
+    * **Do not run the script from GitHub.** A script with usernames and the public key will be provided on Discord.
+
 11. Disable cron/at/anacron.
     * `systemctl disable --now crond`
     * `systemctl disable --now cron`
@@ -84,3 +87,5 @@ First steps to run once VMs are accessible. **Not for MikroTik router.**
     * `systemctl disable --now atd`
     * `systemctl disable --now anacron`
     * `systemctl disable --now anacrond`
+
+12. Notify group that initial access runbook is complete. Proceed with service setup.
