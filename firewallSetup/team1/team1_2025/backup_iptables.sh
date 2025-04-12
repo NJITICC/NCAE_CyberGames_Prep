@@ -9,12 +9,12 @@ if [ "$EUID" -ne 0 ]
     exit 1
 fi
 
-ROUTER="192.168.4.1"
-BACKUP="192.168.4.15"
+ROUTER="192.168.9.1"
+BACKUP="192.168.9.15"
 COMP_DNS="172.18.0.12"
-DNS="192.168.4.12"
-WEB="192.168.4.5"
-DATABASE="192.168.4.7"
+DNS="192.168.9.12"
+WEB="192.168.9.5"
+DATABASE="192.168.9.7"
 
 # Loads conntrack.
 modprobe ip_conntrack

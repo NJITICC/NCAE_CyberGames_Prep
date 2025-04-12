@@ -9,8 +9,8 @@ if [ "$EUID" -ne 0 ]
     exit 1
 fi
 
-ROUTER="192.168.4.1"
-BACKUP="192.168.4.15"
+ROUTER="192.168.9.1"
+BACKUP="192.168.9.15"
 COMP_DNS="172.18.0.12"
 SQL_PORT="5432"
 

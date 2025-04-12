@@ -82,3 +82,12 @@ These errors occur when a lockfile exists. Lockfiles are intended to prevent rac
   sudo rm /var/cache/apt/archives/lock
   sudo dpkg --configure -a
   ```
+### Fixes
+
+`systemctl list-unit-files`
+
+This is to check if any of the services are listed as masked 
+
+#### To unmask
+
+`sudo systemctl unmask nginx.service`

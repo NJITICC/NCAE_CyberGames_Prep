@@ -9,10 +9,10 @@ if [ "$EUID" -ne 0 ]
     exit 1
 fi
 
-ROUTER="192.168.4.1"
-BACKUP="192.168.4.15"
+ROUTER="192.168.9.1"
+BACKUP="192.168.9.15"
 COMP_DNS="172.18.0.12"
-SQL="192.168.4.7"
+SQL="192.168.9.7"
 CA="172.18.0.38"
 CDN="172.18.13.25"
 
@@ -36,8 +36,7 @@ iptables -A OUTPUT -d 192.168.0.0/16 -m conntrack --ctstate NEW,INVALID -j REJEC
 # Allow services in.
 iptables -A INPUT -p tcp --dport 80 -j ACCEPT
 iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-iptables -A INPUT -s $ROUTER -p tcp --dport 22 -j ACCEPT
-iptables -A INPUT -s $BACKUP -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 
 # Default policy.
 iptables -P FORWARD DROP
