@@ -29,7 +29,7 @@ server {
 
     listen 443 ssl http2;
 
-    server_name team4.ncaecybergames.org;
+    server_name team9.ncaecybergames.org;
 
     ssl_certificate /path/to/fullchain.pem;
     ssl_certificate_key /path/to/privkey.pem;
@@ -49,7 +49,7 @@ Replace `/path/to/fullchain.pem;` to actual file location of .pem
 Enable  this configuration file by creating a link from it to the `sites-enabled` directory that Nginx reads at startup:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/team4.ncaecybergames.org /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/team9.ncaecybergames.org /etc/nginx/sites-enabled/
 ```
 
 You can now test your configuration file for syntax errors:
@@ -86,13 +86,10 @@ sudo vim /etc/apache2/sites-available/000-default.conf
     ProxyPassReverse / http://localhost:8000/
 </VirtualHost>
 <VirtualHost *:443>
-    ServerName team4.ncaecybergames.org
-    SSLProxyEngine On
-    SSLProxyVerify require
-    SSLProxyCACertificateFile /path/to/custom_cert.pem
-    SSLProxyCheckPeerCN on  # or omit, default is on
-    ProxyPass / https://localhost:8000/
-    ProxyPassReverse / https:localhost:8000/
+    ServerName team9.ncaecybergames.org
+    SSLEngine on  # or omit, default is on
+    SSLCertificateFile "/path/to/www.example.com.cert"
+    SSLCertificateKeyFile "/path/to/www.example.com.key"
 </VirtualHost>
 ```
 
@@ -107,7 +104,7 @@ sudo systemctl restart apache2
 - Cert script is
 
 # Cert Script
-certbot --nginx --server https://ca.ncaecybergames.org/acme/acme/directory
+certbot --nginx --server https://ca.ncaecybergames.org/acme/acme/directory --no-random-sleep-on-renew
 
 Check if md5sum = 761e8fbafabceac17680a28c82a097d2
 
