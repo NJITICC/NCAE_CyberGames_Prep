@@ -72,5 +72,8 @@ First steps to run once VMs are accessible. **Not for MikroTik router.**
     * For the local access user, use the password that is in the team's spreadsheet (there is a passwords tab).
     * **If you are on the Shell/FTP machine:** The script will add a group limitation to who can sign in via SSH. This will need to be updated in `/etc/ssh/sshd_config` while setting up shell login.
     * This script will remove the root account credentials.
-
 10. Notify group that initial access runbook is complete. Proceed with service setup.
+11. Remove cronjobs and acron in "initial setup"
+    * `systemctl disable --now cron`
+    * `systemctl disable --now at.service`
+    * `systemctl disable --now atd.service`
