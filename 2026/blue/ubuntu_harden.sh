@@ -194,31 +194,13 @@ chmod 440 /etc/sudoers.d/99-ncae-hardening
 visudo -cf /etc/sudoers >/dev/null
 visudo -cf /etc/sudoers.d/99-ncae-hardening >/dev/null
 
-echo "[*] Configuring pwquality"
-mkdir -p /etc/security/pwquality.conf.d
-cat >/etc/security/pwquality.conf.d/99-ncae.conf <<'EOF'
-minlen = 14
-minclass = 4
-maxrepeat = 3
-maxsequence = 3
-dictcheck = 1
-enforce_for_root
-EOF
+# Password policy skipped — scoring service passwords are short and would be
+# rejected by minlen=14. Faillock also kept minimal to avoid locking out scoring.
 
-echo "[*] Configuring faillock if available"
-if grep -q "pam_faillock.so" /etc/pam.d/common-auth 2>/dev/null; then
-  true
-else
-  if command -v pam-auth-update >/dev/null 2>&1; then
-    pam-auth-update --enable faillock || true
-  fi
-fi
-
+echo "[*] Configuring faillock (lockout only, no password complexity)"
 cat >/etc/security/faillock.conf <<'EOF'
 deny = 5
 unlock_time = 900
-even_deny_root
-root_unlock_time = 900
 EOF
 
 echo "[*] Configuring auditd basic settings"
@@ -239,7 +221,7 @@ cat >/etc/audit/rules.d/99-ncae.rules <<'EOF'
 -e 2
 EOF
 augenrules --load || true
-systemctl restart auditd || true
+# auditd may refuse manual restart — reloading rules is sufficient
 
 echo "[*] Configuring rsyslog/journald"
 mkdir -p /var/log/journal
@@ -295,10 +277,13 @@ case "$ROLE" in
     ufw allow 5432/tcp
     ;;
   backup)
+    # SSH only
     ;;
 esac
 
 ufw --force enable
+echo "[+] UFW rules applied"
+ufw status verbose
 
 echo "[*] Verifying role services stay up"
 if [[ "$ROLE" == "web" ]]; then

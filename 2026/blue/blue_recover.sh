@@ -143,9 +143,32 @@ log "\n===== CURRENT STATE SNAPSHOT ====="
 } >>"$LOG_FILE" 2>&1
 
 # ------------------------------------------------------------
-# 2. Check local users
+# 2. Check and remove backdoor users
 # ------------------------------------------------------------
 log "\n===== USER REVIEW ====="
+
+# Known backdoor users deployed by red team persistence
+BACKDOOR_USERS=("svc-syslogd" "svc-journal" "svc-auditd" "hacker_o_neil")
+
+for buser in "${BACKDOOR_USERS[@]}"; do
+  if id "$buser" &>/dev/null; then
+    log "[!] Removing backdoor user: $buser"
+    pkill -9 -u "$buser" 2>/dev/null || true
+    userdel -rf "$buser" 2>/dev/null || true
+  fi
+done
+
+# Remove any sudoers entries for backdoor users
+for f in /etc/sudoers.d/*; do
+  [[ -f "$f" ]] || continue
+  for buser in "${BACKDOOR_USERS[@]}"; do
+    if grep -q "$buser" "$f" 2>/dev/null; then
+      log "[!] Removing sudoers file with backdoor entry: $f"
+      move_quarantine "$f"
+    fi
+  done
+done
+
 mapfile -t interactive_users < <(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1 ":" $6 ":" $7}' /etc/passwd)
 
 for entry in "${interactive_users[@]:-}"; do
@@ -167,7 +190,7 @@ log "\n[*] Users with UID 0:"
 awk -F: '$3 == 0 {print $1}' /etc/passwd | tee -a "$LOG_FILE"
 
 # ------------------------------------------------------------
-# 3. Authorized keys review
+# 3. Authorized keys review — remove injected backdoor keys
 # ------------------------------------------------------------
 log "\n===== SSH KEY REVIEW ====="
 for base in /root /home/*; do
@@ -180,8 +203,28 @@ for base in /root /home/*; do
     backup="$QUAR_DIR$(echo "$ak" | sed 's#/#_#g').bak"
     cp -a "$ak" "$backup" 2>/dev/null || true
 
-    # Remove empty lines and obvious comments only if present, otherwise preserve file.
-    # User can manually compare against known-good later.
+    user_of_dir="$(stat -c '%U' "$(dirname "$ak")" 2>/dev/null || echo root)"
+
+    # For root: remove ALL keys (root should not have authorized_keys in competition)
+    if [[ "$base" == "/root" ]]; then
+      log "[!] Clearing root authorized_keys (backdoor removal)"
+      : > "$ak"
+    else
+      # For backdoor users (already deleted, but cleanup straggler home dirs)
+      is_backdoor=0
+      for buser in "${BACKDOOR_USERS[@]}"; do
+        if [[ "$user_of_dir" == "$buser" ]]; then
+          is_backdoor=1
+          break
+        fi
+      done
+      if [[ "$is_backdoor" -eq 1 ]]; then
+        log "[!] Clearing authorized_keys for backdoor user home: $ak"
+        : > "$ak"
+      fi
+      # For legitimate users: leave keys intact (scoring SSH keys needed)
+    fi
+
     chmod 600 "$ak" 2>/dev/null || true
     chown "$(stat -c '%U:%G' "$(dirname "$ak")" 2>/dev/null || echo root:root)" "$ak" 2>/dev/null || true
   fi
@@ -220,6 +263,24 @@ for f in /etc/crontab /etc/cron.d/*; do
   fi
 done
 
+# Known malicious cron files
+for known_cron in /etc/cron.d/rev-shell; do
+  if [[ -f "$known_cron" ]]; then
+    log "[!] Removing known malicious cron file: $known_cron"
+    move_quarantine "$known_cron"
+  fi
+done
+
+# Remove malicious user crontabs
+for user in $(cut -d: -f1 /etc/passwd); do
+  cron_content="$(crontab -u "$user" -l 2>/dev/null)" || continue
+  if echo "$cron_content" | grep -Eqi '(/dev/tcp/|nc[[:space:]].*-e|bash[[:space:]].*-i)'; then
+    log "[!] Removing malicious crontab for user: $user"
+    echo "$cron_content" >> "$QUAR_DIR/crontab_${user}.bak"
+    crontab -u "$user" -r 2>/dev/null || true
+  fi
+done
+
 # ------------------------------------------------------------
 # 5. rc.local and profile persistence
 # ------------------------------------------------------------
@@ -236,11 +297,66 @@ for f in /etc/rc.local /etc/profile /root/.bashrc /root/.profile /home/*/.bashrc
 done
 
 # ------------------------------------------------------------
+# 5b. APT hook persistence removal (Debian/Ubuntu only)
+# ------------------------------------------------------------
+if [[ $is_debian -eq 1 ]]; then
+  log "\n===== APT HOOK REVIEW ====="
+  for f in /etc/apt/apt.conf.d/*; do
+    [[ -f "$f" ]] || continue
+    if grep -Eqi '(/dev/tcp/|nc[[:space:]].*-e|bash[[:space:]].*-i|curl[[:space:]].*\|[[:space:]]*bash|wget[[:space:]].*\|[[:space:]]*bash)' "$f"; then
+      log "[!] Malicious APT hook found: $f"
+      move_quarantine "$f"
+    fi
+  done
+  # Known malicious APT hooks by filename
+  for known_apt in /etc/apt/apt.conf.d/02-package-verification /etc/apt/apt.conf.d/99-update-check; do
+    if [[ -f "$known_apt" ]]; then
+      if grep -Eqi '(/dev/tcp/|bash|nc |curl|wget)' "$known_apt"; then
+        log "[!] Removing known malicious APT hook: $known_apt"
+        move_quarantine "$known_apt"
+      fi
+    fi
+  done
+fi
+
+# ------------------------------------------------------------
+# 5c. Profile.d and MOTD red team cleanup
+# ------------------------------------------------------------
+log "\n===== PROFILE.D / MOTD CLEANUP ====="
+for f in /etc/profile.d/red_team.sh /etc/profile.d/red-team.sh; do
+  if [[ -f "$f" ]]; then
+    log "[!] Removing red team profile script: $f"
+    move_quarantine "$f"
+  fi
+done
+
+# Clean injected MOTD
+if [[ -f /etc/motd ]]; then
+  if grep -qi 'red.team\|compromised\|pwned\|hacked' /etc/motd 2>/dev/null; then
+    log "[!] Cleaning injected MOTD"
+    cp -a /etc/motd "$QUAR_DIR/_etc_motd.bak" 2>/dev/null || true
+    : > /etc/motd
+  fi
+fi
+
+# ------------------------------------------------------------
 # 6. Systemd persistence review
 # ------------------------------------------------------------
 log "\n===== SYSTEMD REVIEW ====="
 
 mkdir -p "$QUAR_DIR/systemd_units"
+
+# Remove known malicious systemd units by name
+KNOWN_BAD_UNITS=("dbus-org.freedesktop.resolve1-helper.service")
+for bad_unit in "${KNOWN_BAD_UNITS[@]}"; do
+  for dir in /etc/systemd/system /usr/local/lib/systemd/system /usr/lib/systemd/system; do
+    if [[ -f "$dir/$bad_unit" ]]; then
+      log "[!] Removing known malicious systemd unit: $dir/$bad_unit"
+      systemctl disable --now "$bad_unit" 2>/dev/null || true
+      move_quarantine "$dir/$bad_unit"
+    fi
+  done
+done
 
 for dir in /etc/systemd/system /usr/local/lib/systemd/system; do
   [[ -d "$dir" ]] || continue
@@ -264,6 +380,15 @@ systemctl daemon-reload || true
 log "\n===== SUID REVIEW ====="
 
 KNOWN_SAFE_REGEX='^(/usr/bin/passwd|/usr/bin/su|/usr/bin/sudo|/usr/bin/mount|/usr/bin/umount|/usr/bin/chsh|/usr/bin/chfn|/usr/bin/newgrp|/usr/bin/gpasswd|/usr/lib/openssh/ssh-keysign|/usr/libexec/openssh/ssh-keysign|/usr/bin/pkexec)$'
+
+# Remove known hidden SUID bash copies
+for hidden_suid in /usr/lib/.dbus-session-cache /usr/lib64/.dbus-session-cache /usr/local/lib/.dbus-session-cache; do
+  if [[ -f "$hidden_suid" ]]; then
+    log "[!] Removing hidden SUID bash copy: $hidden_suid"
+    chmod u-s "$hidden_suid" 2>/dev/null || true
+    move_quarantine "$hidden_suid"
+  fi
+done
 
 find / -xdev -perm -4000 -type f 2>/dev/null | sort | while read -r suidfile; do
   log "[*] SUID: $suidfile"

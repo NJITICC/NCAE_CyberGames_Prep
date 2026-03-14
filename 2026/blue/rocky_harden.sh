@@ -188,24 +188,13 @@ chmod 440 /etc/sudoers.d/99-ncae-hardening
 visudo -cf /etc/sudoers >/dev/null
 visudo -cf /etc/sudoers.d/99-ncae-hardening >/dev/null
 
-echo "[*] Configuring pwquality"
-mkdir -p /etc/security/pwquality.conf.d
-cat >/etc/security/pwquality.conf.d/99-ncae.conf <<'EOF'
-minlen = 14
-minclass = 4
-maxrepeat = 3
-maxsequence = 3
-dictcheck = 1
-enforce_for_root
-EOF
+# Password policy skipped — scoring SMB passwords are short and would be rejected
+# by minlen=14. Faillock also skipped to avoid locking out scoring users.
 
-echo "[*] Configuring faillock"
-authselect current >/dev/null 2>&1 && authselect enable-feature with-faillock || true
+echo "[*] Configuring faillock (lockout only, no password complexity)"
 cat >/etc/security/faillock.conf <<'EOF'
 deny = 5
 unlock_time = 900
-even_deny_root
-root_unlock_time = 900
 EOF
 
 echo "[*] Configuring auditd basic settings"
@@ -226,7 +215,7 @@ cat >/etc/audit/rules.d/99-ncae.rules <<'EOF'
 -e 2
 EOF
 augenrules --load || true
-systemctl restart auditd || true
+# auditd refuses manual restart on Rocky — reloading rules is sufficient
 
 echo "[*] Configuring rsyslog/journald"
 mkdir -p /var/log/journal
@@ -268,18 +257,25 @@ EOF
 chmod 700 /etc/cron.daily/aide-check
 
 echo "[*] Applying firewall rules"
+systemctl enable --now firewalld
 firewall-cmd --permanent --set-default-zone=public
-firewall-cmd --permanent --remove-service=dhcpv6-client || true
-firewall-cmd --permanent --add-service=ssh
+
+# Remove all pre-existing services to start clean
+for svc in $(firewall-cmd --permanent --list-services 2>/dev/null); do
+  firewall-cmd --permanent --remove-service="$svc" 2>/dev/null || true
+done
+
+# SSH on all machines
+firewall-cmd --permanent --add-port=22/tcp
 
 if [[ "$ROLE" == "dns" ]]; then
-  firewall-cmd --permanent --add-service=dns
-  firewall-cmd --permanent --remove-service=samba || true
+  firewall-cmd --permanent --add-port=53/tcp
+  firewall-cmd --permanent --add-port=53/udp
 fi
 
 if [[ "$ROLE" == "smb" ]]; then
-  firewall-cmd --permanent --add-service=samba
-  firewall-cmd --permanent --remove-service=dns || true
+  firewall-cmd --permanent --add-port=139/tcp
+  firewall-cmd --permanent --add-port=445/tcp
 fi
 
 firewall-cmd --reload
